@@ -74,6 +74,26 @@ public static partial class KiotaSerializer
                             throw new InvalidOperationException($"No factory method found for type {type.Name}");
         return (ParsableFactory<T>)factoryMethod.CreateDelegate(typeof(ParsableFactory<T>));
     }
+
+#if NET5_0_OR_GREATER
+    private static ParsableFactory<IParsable> GetFactoryFromType([DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] Type type)
+#else
+    private static ParsableFactory<IParsable> GetFactoryFromType(Type type)
+#endif
+    {
+        if(!typeof(IParsable).IsAssignableFrom(type))
+        {
+            throw new ArgumentException($"Type {type.Name} does not implement IParsable", nameof(type));
+        }
+
+        var factoryMethod = Array.Find(type.GetMethods(), static x => x.IsStatic && "CreateFromDiscriminatorValue".Equals(x.Name, StringComparison.OrdinalIgnoreCase)) ??
+                            throw new InvalidOperationException($"No factory method found for type {type.Name}");
+
+        Type parsableFactoryType = typeof(ParsableFactory<>).MakeGenericType(type);
+
+        return (ParsableFactory<IParsable>)factoryMethod.CreateDelegate(parsableFactoryType);
+    }
+
     /// <summary>
     /// Deserializes the given stream into an object based on the content type.
     /// </summary>
